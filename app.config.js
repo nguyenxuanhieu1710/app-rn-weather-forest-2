@@ -1,0 +1,49 @@
+module.exports = {
+  expo: {
+    name: "Weather Forest",
+    slug: "weather-forest",
+    version: "1.0.0",
+    orientation: "portrait",
+    icon: "./assets/icon.png",
+    userInterfaceStyle: "light",
+    splash: {
+      image: "./assets/splash.png",
+      resizeMode: "contain",
+      backgroundColor: "#007AFF"
+    },
+    assetBundlePatterns: [
+      "**/*"
+    ],
+    ios: {
+      supportsTablet: true,
+      bundleIdentifier: "com.weatherforest.app",
+      infoPlist: {
+        NSLocationWhenInUseUsageDescription: "We need your location to provide accurate weather forecasts"
+      }
+    },
+    android: {
+      adaptiveIcon: {
+        foregroundImage: "./assets/adaptive-icon.png",
+        backgroundColor: "#007AFF"
+      },
+      package: "com.weatherforest.app",
+      permissions: [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    },
+    web: {
+      favicon: "./assets/favicon.png"
+    },
+    plugins: [
+      [
+        "expo-location",
+        {
+          locationAlwaysAndWhenInUsePermission: "We need your location to provide accurate weather forecasts."
+        }
+      ]
+    ]
+  }
+};
+
+

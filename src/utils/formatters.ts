@@ -114,10 +114,9 @@ export const getConditionIcon = (conditionCode: string): string => {
   return '🌤️';
 };
 
-// Convert Open Meteo WMO weather code to condition string
+// Convert WMO weather code to condition string
 export const getConditionFromCode = (weatherCode: number): string => {
-  // WMO Weather interpretation codes (WW)
-  // https://open-meteo.com/en/docs
+  // WMO Weather interpretation codes (WW) - International standard
   if (weatherCode === 0) return 'Clear Sky';
   if (weatherCode === 1) return 'Mainly Clear';
   if (weatherCode === 2) return 'Partly Cloudy';

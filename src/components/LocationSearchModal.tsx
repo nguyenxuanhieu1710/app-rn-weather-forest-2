@@ -9,7 +9,12 @@ import {
   FlatList,
   ActivityIndicator,
 } from 'react-native';
-import {vietnamProvinces, searchVietnamProvinces, VietnamProvince} from '../utils/vietnamProvinces';
+import {
+  loadVietnamProvinces,
+  getVietnamProvinces,
+  searchVietnamProvinces,
+  VietnamProvince,
+} from '../utils/vietnamProvinces';
 import {Location} from '../models/Weather';
 import {COLORS} from '../utils/colors';
 import {SPACING, BORDER_RADIUS, FONT_SIZE} from '../utils/constants';
@@ -29,6 +34,20 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [vietnamResults, setVietnamResults] = useState<VietnamProvince[]>([]);
+  const [provinces, setProvinces] = useState<VietnamProvince[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Load dữ liệu khi component mount
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await loadVietnamProvinces();
+      const loadedProvinces = getVietnamProvinces();
+      setProvinces(loadedProvinces);
+      setLoading(false);
+    };
+    loadData();
+  }, []);
 
   useEffect(() => {
     // Only search Vietnam provinces
@@ -44,9 +63,10 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
     const location: Location = {
       latitude: province.latitude,
       longitude: province.longitude,
-      city: province.name,
-      country: 'Việt Nam',
-      address: `${province.name}, Việt Nam`,
+      city: province.nameEn,
+      country: 'Vietnam',
+      address: `${province.nameEn}, Vietnam`,
+      location_id: province.location_id, // Lưu location_id để dùng cho summary.json
     };
     onSelectLocation(location);
     setSearchQuery('');
@@ -102,28 +122,37 @@ export const LocationSearchModal: React.FC<LocationSearchModalProps> = ({
           </TouchableOpacity>
         )}
 
-        <FlatList
-          data={searchQuery.length > 0 ? vietnamResults : vietnamProvinces}
-          keyExtractor={item => item.id}
-          renderItem={({item}) => (
-            <TouchableOpacity
-              style={styles.resultItem}
-              onPress={() => handleSelectVietnamProvince(item)}>
-              <Text style={styles.resultIcon}>🇻🇳</Text>
-              <View style={styles.resultText}>
-                <Text style={styles.resultName}>{item.name}</Text>
-                <Text style={styles.resultDetails}>{item.region}</Text>
-              </View>
-            </TouchableOpacity>
-          )}
-          ListEmptyComponent={
-            searchQuery.length > 0 && vietnamResults.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>Không tìm thấy tỉnh thành</Text>
-              </View>
-            ) : null
-          }
-        />
+        {loading ? (
+          <View style={styles.emptyContainer}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={styles.emptyText}>Đang tải dữ liệu...</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={searchQuery.length > 0 ? vietnamResults : provinces}
+            keyExtractor={item => item.id}
+            renderItem={({item}) => (
+              <TouchableOpacity
+                style={styles.resultItem}
+                onPress={() => handleSelectVietnamProvince(item)}>
+                <Text style={styles.resultIcon}>🇻🇳</Text>
+                <View style={styles.resultText}>
+                  <Text style={styles.resultName}>{item.nameEn}</Text>
+                  <Text style={styles.resultDetails}>
+                    {item.latitude.toFixed(2)}, {item.longitude.toFixed(2)}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+            ListEmptyComponent={
+              searchQuery.length > 0 && vietnamResults.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>Không tìm thấy địa điểm</Text>
+                </View>
+              ) : null
+            }
+          />
+        )}
       </View>
     </Modal>
   );

@@ -4,6 +4,7 @@ export interface Location {
   city: string;
   country: string;
   address?: string;
+  location_id?: string; // ID từ latest.json để map với summary.json
 }
 
 export interface CurrentWeather {
@@ -47,6 +48,13 @@ export interface DailyForecast {
   sunrise: string;
   sunset: string;
   hourly: HourlyForecast[];
+  // Thêm dữ liệu từ daily.json
+  kind?: string; // 'past' | 'today' | 'future'
+  temp_mean_c?: number; // Nhiệt độ trung bình
+  hour_count?: number; // Tổng số giờ
+  obs_hours?: number; // Số giờ quan sát
+  fcst_hours?: number; // Số giờ dự báo
+  missing_hours?: number; // Số giờ thiếu
 }
 
 export interface WeatherAlert {
@@ -68,6 +76,11 @@ export interface WeatherData {
   daily: DailyForecast[];
   alerts: WeatherAlert[];
   lastUpdated: string;
+  // Thêm dữ liệu từ summary.json
+  todaySummary?: string; // Từ summary.json today.summary_text
+  overallAlertLevel?: string; // Từ summary.json alerts.overall_level
+  overallAlertComment?: string; // Từ summary.json alerts.overall_comment
 }
+
 
 

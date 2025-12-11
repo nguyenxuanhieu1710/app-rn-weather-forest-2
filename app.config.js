@@ -4,10 +4,10 @@ module.exports = {
     slug: "weather-forest",
     version: "1.0.0",
     orientation: "portrait",
-    icon: "./assets/icon.png",
+    // icon: "./assets/icon.png", // Commented out - create assets folder and add icon.png if needed
     userInterfaceStyle: "light",
     splash: {
-      image: "./assets/splash.png",
+      // image: "./assets/splash.png", // Commented out - create assets folder and add splash.png if needed
       resizeMode: "contain",
       backgroundColor: "#007AFF"
     },
@@ -22,18 +22,15 @@ module.exports = {
       }
     },
     android: {
-      adaptiveIcon: {
-        foregroundImage: "./assets/adaptive-icon.png",
-        backgroundColor: "#007AFF"
-      },
+      // adaptiveIcon: {
+      //   foregroundImage: "./assets/adaptive-icon.png", // Commented out - create assets folder and add adaptive-icon.png if needed
+      //   backgroundColor: "#007AFF"
+      // },
       package: "com.weatherforest.app",
       permissions: [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
       ]
-    },
-    web: {
-      favicon: "./assets/favicon.png"
     },
     plugins: [
       [
@@ -45,5 +42,6 @@ module.exports = {
     ]
   }
 };
+
 
 

@@ -1,64 +1,363 @@
-import React from 'react';
-import {View, Text, StyleSheet, ScrollView} from 'react-native';
+import React, {useState, useEffect, useRef} from 'react';
+import {View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions, ScrollView} from 'react-native';
 import {useWeather} from '../providers/WeatherProvider';
-import {HourlyForecastCard} from '../components/HourlyForecastCard';
+import {useLocation} from '../providers/LocationProvider';
 import {LoadingSpinner} from '../components/LoadingSpinner';
 import {COLORS} from '../utils/colors';
 import {SPACING, FONT_SIZE, BORDER_RADIUS} from '../utils/constants';
+import {loadTimeseriesData} from '../utils/weatherDataApi';
+import {formatTime} from '../utils/formatters';
+
+const {width: SCREEN_WIDTH, height: SCREEN_HEIGHT} = Dimensions.get('window');
+
+type ModelProvider = 'XGBoost' | 'LightGBM' | 'RidgeRegression' | 'GRU';
+
+interface TimeseriesStep {
+  valid_at: string;
+  source: string;
+  temp_c: number | null;
+  wind_ms: number | null;
+  precip_mm: number | null;
+  rel_humidity_pct: number | null;
+  wind_dir_deg: number | null;
+  cloudcover_pct: number | null;
+  surface_pressure_hpa: number | null;
+}
+
+const DEFAULT_LOCATION_ID = '400a5792-7432-4ab5-a280-97dd91b21621';
 
 export const HourlyScreen: React.FC = () => {
   const {weatherData, loading, temperatureUnit} = useWeather();
+  const {location} = useLocation();
+  const [timeseriesSteps, setTimeseriesSteps] = useState<TimeseriesStep[]>([]);
+  const [loadingTimeseries, setLoadingTimeseries] = useState(true);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [selectedModel, setSelectedModel] = useState<ModelProvider>('XGBoost');
+  const flatListRef = useRef<FlatList>(null);
+
+  useEffect(() => {
+    const loadTimeseries = async () => {
+      try {
+        setLoadingTimeseries(true);
+        const locationId = location?.location_id || DEFAULT_LOCATION_ID;
+        const timeseriesData = await loadTimeseriesData(locationId, selectedModel);
+        
+        if (timeseriesData && timeseriesData.steps) {
+          // Lấy TẤT CẢ các steps (48 giờ trước + 96 giờ tiếp theo)
+          const allSteps = timeseriesData.steps
+            .filter(step => step.temp_c !== null)
+            .map(step => ({
+              valid_at: step.valid_at,
+              source: step.source,
+              temp_c: step.temp_c,
+              wind_ms: step.wind_ms,
+              precip_mm: step.precip_mm,
+              rel_humidity_pct: step.rel_humidity_pct,
+              wind_dir_deg: step.wind_dir_deg,
+              cloudcover_pct: step.cloudcover_pct,
+              surface_pressure_hpa: step.surface_pressure_hpa,
+            }));
+          setTimeseriesSteps(allSteps);
+        }
+      } catch (error) {
+        console.error('Error loading timeseries:', error);
+      } finally {
+        setLoadingTimeseries(false);
+      }
+    };
+
+    if (location) {
+      loadTimeseries();
+    }
+  }, [location, selectedModel]);
+
+  // Phân loại steps: quá khứ, hiện tại, tương lai
+  const now = new Date();
+  const pastSteps = timeseriesSteps.filter(step => new Date(step.valid_at) < now);
+  const currentStep = timeseriesSteps.find(step => {
+    const stepTime = new Date(step.valid_at);
+    const diff = Math.abs(stepTime.getTime() - now.getTime());
+    return diff < 3600000; // Trong vòng 1 giờ
+  });
+  const futureSteps = timeseriesSteps.filter(step => new Date(step.valid_at) > now);
+
+  // Tìm index của giờ hiện tại trong timeseriesSteps
+  const currentStepIndex = currentStep 
+    ? timeseriesSteps.findIndex(step => step.valid_at === currentStep.valid_at)
+    : -1;
+  const initialIndex = currentStepIndex >= 0 ? currentStepIndex : 0;
+
+  // Scroll đến giờ hiện tại khi component mount - LUÔN GỌI (không có điều kiện)
+  useEffect(() => {
+    if (timeseriesSteps.length > 0 && currentStepIndex >= 0) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({
+          index: currentStepIndex,
+          animated: false,
+        });
+        setCurrentIndex(currentStepIndex);
+      }, 100);
+    }
+  }, [timeseriesSteps.length, currentStepIndex]);
 
   if (loading && !weatherData) {
     return <LoadingSpinner message="Đang tải dự báo theo giờ..." />;
   }
 
-  if (!weatherData || weatherData.hourly.length === 0) {
+  if (loadingTimeseries) {
+    return <LoadingSpinner message="Đang tải dữ liệu timeseries..." />;
+  }
+
+  if (timeseriesSteps.length === 0 && (!weatherData || weatherData.hourly.length === 0)) {
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>Không có dự báo theo giờ</Text>
+      <View style={styles.container}>
+        <View style={styles.modelSelectorContainer}>
+          <Text style={styles.modelSelectorTitle}>Chọn Model Provider</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.modelButtonsContainer}>
+            {(['XGBoost', 'LightGBM', 'RidgeRegression', 'GRU'] as ModelProvider[]).map(model => (
+              <TouchableOpacity
+                key={model}
+                style={[
+                  styles.modelButton,
+                  selectedModel === model && styles.modelButtonActive,
+                ]}
+                onPress={() => setSelectedModel(model)}>
+                <Text
+                  style={[
+                    styles.modelButtonText,
+                    selectedModel === model && styles.modelButtonTextActive,
+                  ]}>
+                  {model}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>Không có dữ liệu cho model {selectedModel}</Text>
+        </View>
       </View>
     );
   }
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <Text style={styles.title}>Dự báo 24 giờ</Text>
-      <HourlyForecastCard
-        forecasts={weatherData.hourly}
-        temperatureUnit={temperatureUnit}
-      />
-      <View style={styles.detailsSection}>
-        <Text style={styles.sectionTitle}>Chi tiết theo giờ</Text>
-        {weatherData.hourly.map((forecast, index) => (
-          <View key={index} style={styles.detailItem}>
-            <View style={styles.detailLeft}>
-              <Text style={styles.detailTime}>
-                {new Date(forecast.time).toLocaleTimeString('en-US', {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                })}
-              </Text>
-              <Text style={styles.detailIcon}>{forecast.icon}</Text>
-            </View>
-            <View style={styles.detailMiddle}>
-              <Text style={styles.detailCondition}>{forecast.condition}</Text>
-              {forecast.precipitation > 0 && (
-                <Text style={styles.detailPrecipitation}>
-                  💧 {Math.round(forecast.precipitation * 100)}% khả năng
-                </Text>
-              )}
-            </View>
-            <View style={styles.detailRight}>
-              <Text style={styles.detailTemp}>
-                {Math.round(forecast.temperature)}°{temperatureUnit}
-              </Text>
-              <Text style={styles.detailWind}>💨 {Math.round(forecast.windSpeed)} km/h</Text>
+  const getWindDirection = (degrees: number | null): string => {
+    if (degrees === null) return '-';
+    const directions = ['Bắc', 'ĐBắc', 'Đông', 'ĐNam', 'Nam', 'TNam', 'Tây', 'TBắc'];
+    const index = Math.round(degrees / 45) % 8;
+    return directions[index];
+  };
+
+  // Tính toán vị trí scroll để về giờ hiện tại
+  const scrollToCurrent = () => {
+    if (currentStepIndex < 0 || !flatListRef.current) return;
+    
+    flatListRef.current.scrollToIndex({
+      index: currentStepIndex,
+      animated: true,
+    });
+    setCurrentIndex(currentStepIndex);
+  };
+
+  // Render mỗi giờ
+  const renderHour = ({item: step, index}: {item: TimeseriesStep; index: number}) => {
+    const date = new Date(step.valid_at);
+    const isObs = step.source === 'obs';
+    const isCurrent = step.valid_at === currentStep?.valid_at;
+    const condition = step.cloudcover_pct && step.cloudcover_pct > 50 ? 'Nhiều mây' : 'Ít mây';
+    const icon = step.cloudcover_pct && step.cloudcover_pct > 50 ? '☁️' : '⛅';
+    const dayNames = ['Chủ nhật', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
+    const dayName = dayNames[date.getDay()];
+    const dateStr = date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    
+    // Xác định loại: quá khứ, hiện tại, tương lai
+    const now = new Date();
+    const stepTime = new Date(step.valid_at);
+    const isPast = stepTime < now;
+    const isFuture = stepTime > now;
+    
+    return (
+      <ScrollView style={styles.hourContainer} showsVerticalScrollIndicator={false}>
+        <View style={styles.headerContainer}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.title}>Dự báo theo giờ</Text>
+            <View style={styles.headerInfo}>
+              <Text style={styles.dateText}>{dayName}, {dateStr}</Text>
+              <Text style={styles.timeText}>{formatTime(step.valid_at)}</Text>
             </View>
           </View>
-        ))}
+          <View style={[styles.pageIndicatorBadge, isCurrent && styles.pageIndicatorBadgeCurrent]}>
+            <Text style={[styles.pageIndicator, isCurrent && styles.pageIndicatorCurrent]}>
+              {index + 1}/{timeseriesSteps.length}
+            </Text>
+          </View>
+        </View>
+
+        <View style={[styles.detailCard, isCurrent && styles.detailCardCurrent, isPast && styles.detailCardPast]}>
+          {/* Badges gộp lại */}
+          <View style={styles.badgesRow}>
+            <View style={[styles.badge, isObs && styles.badgeObs, isCurrent && styles.badgeCurrent]}>
+              <Text style={[styles.badgeText, isCurrent && styles.badgeTextCurrent]}>
+                {isObs ? '📊 Quan sát' : '🔮 Dự báo'}
+              </Text>
+            </View>
+            {isPast && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>📅 Quá khứ</Text>
+              </View>
+            )}
+            {isCurrent && (
+              <View style={[styles.badge, styles.badgeCurrent]}>
+                <Text style={[styles.badgeText, styles.badgeTextCurrent]}>✨ Hiện tại</Text>
+              </View>
+            )}
+            {isFuture && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>🔮 Tương lai</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Icon, Condition và Nhiệt độ gộp lại */}
+          <View style={styles.mainInfo}>
+            <Text style={styles.icon}>{icon}</Text>
+            <View style={styles.tempCondition}>
+              <Text style={[styles.tempValue, isPast && styles.tempValuePast, isCurrent && styles.tempValueCurrent]}>
+                {step.temp_c !== null ? Math.round(step.temp_c) : '-'}°
+              </Text>
+              <Text style={styles.conditionText}>{condition}</Text>
+            </View>
+          </View>
+
+          {/* Thông tin chi tiết - compact grid */}
+          <View style={styles.detailsGrid}>
+            {step.wind_ms !== null && (
+              <View style={styles.detailBox}>
+                <Text style={styles.detailBoxLabel}>💨 Gió</Text>
+                <Text style={styles.detailBoxValue}>{Math.round(step.wind_ms * 3.6)} km/h</Text>
+              </View>
+            )}
+            {step.wind_dir_deg !== null && (
+              <View style={styles.detailBox}>
+                <Text style={styles.detailBoxLabel}>🧭 Hướng</Text>
+                <Text style={styles.detailBoxValue}>{getWindDirection(step.wind_dir_deg)}</Text>
+              </View>
+            )}
+            {step.rel_humidity_pct !== null && (
+              <View style={styles.detailBox}>
+                <Text style={styles.detailBoxLabel}>💧 Ẩm</Text>
+                <Text style={styles.detailBoxValue}>{Math.round(step.rel_humidity_pct)}%</Text>
+              </View>
+            )}
+            {step.precip_mm !== null && step.precip_mm > 0 && (
+              <View style={styles.detailBox}>
+                <Text style={styles.detailBoxLabel}>🌧️ Mưa</Text>
+                <Text style={styles.detailBoxValue}>{step.precip_mm.toFixed(1)}mm</Text>
+              </View>
+            )}
+            {step.cloudcover_pct !== null && (
+              <View style={styles.detailBox}>
+                <Text style={styles.detailBoxLabel}>☁️ Mây</Text>
+                <Text style={styles.detailBoxValue}>{Math.round(step.cloudcover_pct)}%</Text>
+              </View>
+            )}
+            {step.surface_pressure_hpa !== null && (
+              <View style={styles.detailBox}>
+                <Text style={styles.detailBoxLabel}>📊 Áp suất</Text>
+                <Text style={styles.detailBoxValue}>{Math.round(step.surface_pressure_hpa)}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </ScrollView>
+    );
+  };
+
+  // Sắp xếp tất cả steps theo thời gian
+  const allSteps = timeseriesSteps.length > 0 
+    ? timeseriesSteps 
+    : (weatherData?.hourly || []).map(forecast => ({
+        valid_at: forecast.time,
+        source: 'fcst',
+        temp_c: forecast.temperature,
+        wind_ms: forecast.windSpeed / 3.6,
+        precip_mm: forecast.precipitation,
+        rel_humidity_pct: forecast.humidity,
+        wind_dir_deg: null,
+        cloudcover_pct: null,
+        surface_pressure_hpa: null,
+      }));
+
+  return (
+    <View style={styles.container}>
+      {/* Model selector */}
+      <View style={styles.modelSelectorContainer}>
+        <Text style={styles.modelSelectorTitle}>Model Provider</Text>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.modelButtonsContainer}>
+          {(['XGBoost', 'LightGBM', 'RidgeRegression', 'GRU'] as ModelProvider[]).map(model => (
+            <TouchableOpacity
+              key={model}
+              style={[
+                styles.modelButton,
+                selectedModel === model && styles.modelButtonActive,
+              ]}
+              onPress={() => {
+                setSelectedModel(model);
+                setLoadingTimeseries(true);
+              }}>
+              <Text
+                style={[
+                  styles.modelButtonText,
+                  selectedModel === model && styles.modelButtonTextActive,
+                ]}>
+                {model}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
-    </ScrollView>
+
+      <FlatList
+        ref={flatListRef}
+        data={allSteps}
+        renderItem={renderHour}
+        keyExtractor={(item, index) => `hour-${index}-${item.valid_at}`}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        initialScrollIndex={initialIndex}
+        onMomentumScrollEnd={(event) => {
+          const index = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+          setCurrentIndex(index);
+        }}
+        onScrollToIndexFailed={(info) => {
+          setTimeout(() => {
+            flatListRef.current?.scrollToIndex({ index: info.index, animated: false });
+          }, 100);
+        }}
+        getItemLayout={(data, index) => ({
+          length: SCREEN_WIDTH,
+          offset: SCREEN_WIDTH * index,
+          index,
+        })}
+      />
+      
+      {/* Nút scroll về giờ hiện tại */}
+      {currentStep && currentStepIndex >= 0 && (
+        <TouchableOpacity
+          style={styles.scrollToCurrentButton}
+          onPress={scrollToCurrent}
+          activeOpacity={0.8}>
+          <Text style={styles.scrollToCurrentIcon}>⏰</Text>
+          <Text style={styles.scrollToCurrentText}>Hiện tại</Text>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 };
 
@@ -67,17 +366,63 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.background,
   },
-  contentContainer: {
-    paddingBottom: SPACING.xl,
+  hourContainer: {
+    width: SCREEN_WIDTH,
+    flex: 1,
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.sm,
+  },
+  headerLeft: {
+    flex: 1,
   },
   title: {
-    fontSize: FONT_SIZE.xxxl,
+    fontSize: FONT_SIZE.xxl,
     color: COLORS.text,
     fontWeight: '800',
-    marginHorizontal: SPACING.md,
-    marginTop: SPACING.lg,
-    marginBottom: SPACING.md,
-    letterSpacing: -1,
+    letterSpacing: -0.5,
+    marginBottom: SPACING.xs,
+  },
+  headerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  dateText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+  },
+  timeText: {
+    fontSize: FONT_SIZE.md,
+    color: COLORS.primary,
+    fontWeight: '700',
+  },
+  pageIndicatorBadge: {
+    backgroundColor: COLORS.cardBackground,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginLeft: SPACING.sm,
+  },
+  pageIndicatorBadgeCurrent: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  pageIndicator: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  pageIndicatorCurrent: {
+    color: COLORS.textDark,
   },
   emptyContainer: {
     flex: 1,
@@ -89,73 +434,186 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZE.md,
     color: COLORS.textSecondary,
   },
-  detailsSection: {
-    marginTop: SPACING.md,
-  },
-  sectionTitle: {
-    fontSize: FONT_SIZE.xl,
-    color: COLORS.text,
-    fontWeight: '700',
-    marginHorizontal: SPACING.md,
-    marginBottom: SPACING.md,
-    marginTop: SPACING.md,
-    letterSpacing: -0.5,
-  },
-  detailItem: {
-    flexDirection: 'row',
+  detailCard: {
     backgroundColor: COLORS.cardBackground,
     borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.lg,
+    padding: SPACING.md,
     marginHorizontal: SPACING.md,
-    marginVertical: SPACING.sm,
+    marginTop: SPACING.xs,
+    marginBottom: SPACING.md,
     shadowColor: COLORS.shadow,
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
     borderWidth: 1,
     borderColor: COLORS.border,
   },
-  detailLeft: {
-    flex: 1,
+  detailCardCurrent: {
+    borderColor: COLORS.primary,
+    borderWidth: 2,
+    shadowColor: COLORS.shadowPrimary,
+    shadowOpacity: 0.2,
+  },
+  detailCardPast: {
+    opacity: 0.75,
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.xs,
+    marginBottom: SPACING.md,
+  },
+  badge: {
+    backgroundColor: COLORS.background,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  badgeObs: {
+    backgroundColor: COLORS.primary + '20',
+    borderColor: COLORS.primary,
+  },
+  badgeCurrent: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  badgeText: {
+    fontSize: FONT_SIZE.xs,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  badgeTextCurrent: {
+    color: COLORS.textDark,
+  },
+  mainInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.lg,
+    gap: SPACING.md,
+  },
+  icon: {
+    fontSize: 56,
+  },
+  tempCondition: {
     alignItems: 'flex-start',
   },
-  detailTime: {
-    fontSize: FONT_SIZE.sm,
-    color: COLORS.textSecondary,
-    marginBottom: SPACING.xs,
-  },
-  detailIcon: {
-    fontSize: FONT_SIZE.xl,
-  },
-  detailMiddle: {
-    flex: 2,
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.sm,
-  },
-  detailCondition: {
-    fontSize: FONT_SIZE.md,
+  tempValue: {
+    fontSize: FONT_SIZE.xxxl,
     color: COLORS.text,
-    fontWeight: '500',
-    marginBottom: SPACING.xs,
+    fontWeight: '800',
+    letterSpacing: -1,
+    lineHeight: FONT_SIZE.xxxl * 1.1,
   },
-  detailPrecipitation: {
-    fontSize: FONT_SIZE.xs,
+  tempValuePast: {
+    color: COLORS.textSecondary,
+    fontSize: FONT_SIZE.xxl,
+  },
+  tempValueCurrent: {
     color: COLORS.primary,
   },
-  detailRight: {
-    flex: 1,
-    alignItems: 'flex-end',
-  },
-  detailTemp: {
+  conditionText: {
     fontSize: FONT_SIZE.md,
-    color: COLORS.text,
-    fontWeight: '600',
-    marginBottom: SPACING.xs,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+    marginTop: SPACING.xs,
   },
-  detailWind: {
+  detailsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
+  },
+  detailBox: {
+    flex: 1,
+    minWidth: '30%',
+    backgroundColor: COLORS.background,
+    padding: SPACING.sm,
+    borderRadius: BORDER_RADIUS.sm,
+    alignItems: 'center',
+  },
+  detailBoxLabel: {
     fontSize: FONT_SIZE.xs,
     color: COLORS.textSecondary,
+    fontWeight: '500',
+    marginBottom: 2,
+    textAlign: 'center',
+  },
+  detailBoxValue: {
+    fontSize: FONT_SIZE.md,
+    color: COLORS.text,
+    fontWeight: '700',
+  },
+  scrollToCurrentButton: {
+    position: 'absolute',
+    bottom: SPACING.lg + 40,
+    alignSelf: 'center',
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: COLORS.shadow,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 6,
+    borderWidth: 1.5,
+    borderColor: COLORS.primaryDark,
+  },
+  scrollToCurrentIcon: {
+    fontSize: FONT_SIZE.md,
+    marginRight: SPACING.xs,
+  },
+  scrollToCurrentText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textDark,
+    fontWeight: '700',
+  },
+  modelSelectorContainer: {
+    backgroundColor: COLORS.cardBackground,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  modelSelectorTitle: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+    marginBottom: SPACING.sm,
+  },
+  modelButtonsContainer: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  modelButton: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.md,
+    backgroundColor: COLORS.background,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    minHeight: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modelButtonActive: {
+    backgroundColor: COLORS.primary + '10',
+    borderColor: COLORS.primary,
+    borderWidth: 2,
+  },
+  modelButtonText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSecondary,
+    fontWeight: '600',
+  },
+  modelButtonTextActive: {
+    color: COLORS.primary,
+    fontWeight: '700',
   },
 });
 

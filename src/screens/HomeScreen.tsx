@@ -98,6 +98,38 @@ export const HomeScreen: React.FC = () => {
         temperatureUnit={temperatureUnit}
       />
 
+      {/* Today Summary Card */}
+      {weatherData.todaySummary && (
+        <TouchableOpacity style={styles.summaryCard} activeOpacity={0.8}>
+          <View style={styles.summaryHeader}>
+            <Text style={styles.summaryIcon}>📅</Text>
+            <Text style={styles.summaryTitle}>Hôm nay</Text>
+          </View>
+          <Text style={styles.summaryText}>{weatherData.todaySummary}</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Overall Alert Comment - Hiển thị luôn nếu có comment */}
+      {weatherData.overallAlertComment && (
+        <TouchableOpacity style={styles.overallAlertCard} activeOpacity={0.8}>
+          <View style={styles.overallAlertHeader}>
+            <Text style={styles.overallAlertIcon}>
+              {weatherData.overallAlertLevel === 'extreme' ? '🔴' : 
+               weatherData.overallAlertLevel === 'severe' ? '🟠' : 
+               weatherData.overallAlertLevel === 'moderate' ? '🟡' : 
+               weatherData.overallAlertLevel === 'none' ? '✅' : 'ℹ️'}
+            </Text>
+            <Text style={styles.overallAlertTitle}>
+              {weatherData.overallAlertLevel === 'extreme' ? 'Cảnh báo cực kỳ nguy hiểm' :
+               weatherData.overallAlertLevel === 'severe' ? 'Cảnh báo nghiêm trọng' :
+               weatherData.overallAlertLevel === 'moderate' ? 'Cảnh báo vừa phải' : 
+               weatherData.overallAlertLevel === 'none' ? 'Tình trạng thời tiết' : 'Thông tin thời tiết'}
+            </Text>
+          </View>
+          <Text style={styles.overallAlertText}>{weatherData.overallAlertComment}</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Stats Grid - Vertical Layout */}
       <View style={styles.statsContainer}>
         <View style={styles.statsRow}>
@@ -148,7 +180,7 @@ export const HomeScreen: React.FC = () => {
 
       {/* Daily Forecast Preview */}
       <View style={styles.dailySection}>
-        <Text style={styles.sectionTitle}>Dự báo 7 ngày</Text>
+        <Text style={styles.sectionTitle}>Dự báo theo ngày</Text>
         {weatherData.daily.slice(0, 3).map((forecast, index) => (
           <DailyForecastCard
             key={index}
@@ -287,6 +319,75 @@ const styles = StyleSheet.create({
   },
   dailySection: {
     marginTop: SPACING.sm,
+  },
+  summaryCard: {
+    backgroundColor: COLORS.cardBackground,
+    marginHorizontal: SPACING.md,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.sm,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: COLORS.shadow,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+  summaryIcon: {
+    fontSize: FONT_SIZE.lg,
+    marginRight: SPACING.sm,
+  },
+  summaryTitle: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+    color: COLORS.text,
+  },
+  summaryText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
+  },
+  overallAlertCard: {
+    backgroundColor: COLORS.cardBackground,
+    marginHorizontal: SPACING.md,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.sm,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: COLORS.shadow,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  overallAlertHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+  overallAlertIcon: {
+    fontSize: FONT_SIZE.xl,
+    marginRight: SPACING.sm,
+  },
+  overallAlertTitle: {
+    fontSize: FONT_SIZE.md,
+    fontWeight: '700',
+    color: COLORS.text,
+    flex: 1,
+  },
+  overallAlertText: {
+    fontSize: FONT_SIZE.sm,
+    color: COLORS.text,
+    lineHeight: 20,
   },
 });
 

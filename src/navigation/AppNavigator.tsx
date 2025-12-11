@@ -6,16 +6,14 @@ import {Ionicons} from '@expo/vector-icons';
 import {HomeScreen} from '../screens/HomeScreen';
 import {HourlyScreen} from '../screens/HourlyScreen';
 import {WeeklyScreen} from '../screens/WeeklyScreen';
-import {AlertsScreen} from '../screens/AlertsScreen';
-import {useAlerts} from '../providers/AlertProvider';
+import {OverviewScreen} from '../screens/OverviewScreen';
+import {FloodRiskScreen} from '../screens/FloodRiskScreen';
 import {COLORS} from '../utils/colors';
 import {FONT_SIZE} from '../utils/constants';
 
 const Tab = createBottomTabNavigator();
 
 export const AppNavigator: React.FC = () => {
-  const {activeAlerts} = useAlerts();
-
   return (
     <NavigationContainer>
       <Tab.Navigator
@@ -51,6 +49,16 @@ export const AppNavigator: React.FC = () => {
           }}
         />
         <Tab.Screen
+          name="FloodRisk"
+          component={FloodRiskScreen}
+          options={{
+            tabBarIcon: ({color, size}) => (
+              <Ionicons name="water-outline" size={size} color={color} />
+            ),
+            tabBarLabel: 'Nguy cơ lũ',
+          }}
+        />
+        <Tab.Screen
           name="Hourly"
           component={HourlyScreen}
           options={{
@@ -71,14 +79,13 @@ export const AppNavigator: React.FC = () => {
           }}
         />
         <Tab.Screen
-          name="Alerts"
-          component={AlertsScreen}
+          name="Overview"
+          component={OverviewScreen}
           options={{
             tabBarIcon: ({color, size}) => (
-              <Ionicons name="warning-outline" size={size} color={color} />
+              <Ionicons name="stats-chart-outline" size={size} color={color} />
             ),
-            tabBarLabel: 'Cảnh báo',
-            tabBarBadge: activeAlerts.length > 0 ? activeAlerts.length : undefined,
+            tabBarLabel: 'Tổng quan',
           }}
         />
       </Tab.Navigator>

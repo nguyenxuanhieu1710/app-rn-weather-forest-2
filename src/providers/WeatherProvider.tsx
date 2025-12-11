@@ -1,6 +1,6 @@
 import React, {createContext, useContext, useState, useEffect, ReactNode} from 'react';
 import {WeatherData} from '../models/Weather';
-import {fetchWeatherFromOpenMeteo} from '../utils/openMeteoApi';
+import {fetchWeatherFromJson} from '../utils/weatherDataApi';
 import {useLocation} from './LocationProvider';
 
 interface WeatherContextType {
@@ -44,14 +44,17 @@ export const WeatherProvider: React.FC<WeatherProviderProps> = ({children}) => {
         return;
       }
 
-      // Fetch from Open Meteo API (timeout handled in fetchWeatherFromOpenMeteo)
-      const data = await fetchWeatherFromOpenMeteo(location);
+      // Fetch from JSON files dựa trên location_id (sẽ fallback về mặc định nếu không có)
+      // Default provider là XGBoost
+      const data = await fetchWeatherFromJson(location, 'XGBoost');
       
       setWeatherData(data);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Không thể tải dữ liệu thời tiết';
       setError(errorMessage);
       console.error('Weather fetch error:', err);
+      // Đảm bảo loading được set về false ngay cả khi có lỗi
+      setLoading(false);
     } finally {
       setLoading(false);
     }

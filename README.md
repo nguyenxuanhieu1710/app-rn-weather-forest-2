@@ -11,9 +11,12 @@ A beautiful, iOS-style Weather Forecast App built with **React Native** and **Ty
 
 ## 📸 Screenshots
 
-| Home Screen | Weekly Forecast | Weather Details |
-|:-----------:|:---------------:|:---------------:|
-| <img src="https://via.placeholder.com/300x600?text=Home+Screen" width="200" /> | <img src="https://via.placeholder.com/300x600?text=Weekly" width="200" /> | <img src="https://via.placeholder.com/300x600?text=Details" width="200" /> |
+| Home Screen | Flood Risk | Hourly Forecast | Daily Forecast | Overview |
+|:---:|:---:|:---:|:---:|:---:|
+| <img src="https://github.com/user-attachments/assets/22fce7a9-071a-4e28-a0db-1725c097e00a" width="200" /> | <img src="https://github.com/user-attachments/assets/ad461b89-e3da-4c3f-9383-19e77282e44e" width="200" /> | <img src="https://github.com/user-attachments/assets/7ca55038-ae7e-46ad-8f8c-79f7c729613e" width="200" /> | <img src="https://github.com/user-attachments/assets/02f1a94c-4f63-4285-852f-827aef74c5cc" width="200" /> | <img src="https://github.com/user-attachments/assets/c2a7df5a-f4ed-4714-96d4-34138fc69f3d" width="200" /> |
+
+
+
 
 ---
 
